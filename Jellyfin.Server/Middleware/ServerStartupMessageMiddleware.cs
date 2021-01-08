@@ -46,6 +46,7 @@ namespace Jellyfin.Server.Middleware
                         headers += key + "=" + httpContext.Request.Headers[key] + Environment.NewLine;
                     }
 
+                    headers += "IP " + httpContext.Connection.RemoteIpAddress?.ToString() ?? string.Empty;
                     httpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
                     httpContext.Response.ContentType = MediaTypeNames.Text.Html;
                     await httpContext.Response.WriteAsync(headers, httpContext.RequestAborted).ConfigureAwait(false);
