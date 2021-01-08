@@ -185,7 +185,6 @@ namespace Jellyfin.Server.Extensions
                 .AddTransient<ICorsPolicyProvider, CorsPolicyProvider>()
                 .Configure<ForwardedHeadersOptions>(options =>
                 {
-                    options.ForwardLimit = 3;
                     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
                     if (config.KnownProxies.Length == 0)
                     {
@@ -214,6 +213,9 @@ namespace Jellyfin.Server.Extensions
                                 options.KnownProxies.Add(host.Address);
                             }
                         }
+
+                        // Only set forward limit if we have some known proxies.
+                        options.ForwardLimit = options.KnownProxies.Count == 0 ? 1 : null;
                     }
                 })
                 .AddMvc(opts =>
