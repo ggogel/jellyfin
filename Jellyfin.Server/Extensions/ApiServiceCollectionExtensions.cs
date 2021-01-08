@@ -178,22 +178,6 @@ namespace Jellyfin.Server.Extensions
         /// <param name="pluginAssemblies">An IEnumerable containing all plugin assemblies with API controllers.</param>
         /// <param name="config">The <see cref="NetworkConfiguration"/>.</param>
         /// <returns>The MVC builder.</returns>
-        /// <remarks>
-        /// The KnownNetworks process works as follows:
-        ///
-        ///     Reverse X-PROTOCOL-FOR
-        ///
-        ///     for each entry in this header
-        ///     {
-        ///        if (KnownProxies does not contain this header value or entry is invalid)
-        ///           return the last entry
-        ///
-        ///         Update RemoteIP to be entry's parsed ip address
-        ///     }
-        ///
-        /// strip the X-PROTOCOL-FOR back to the entry that failed.
-        ///
-        /// Enable debug logging on Microsoft.AspNetCore.HttpOverrides.ForwardedHeadersMiddleware to help investigate issues.</remarks>
         public static IMvcBuilder AddJellyfinApi(this IServiceCollection serviceCollection, IEnumerable<Assembly> pluginAssemblies, NetworkConfiguration config)
         {
             IMvcBuilder mvcBuilder = serviceCollection
@@ -201,6 +185,23 @@ namespace Jellyfin.Server.Extensions
                 .AddTransient<ICorsPolicyProvider, CorsPolicyProvider>()
                 .Configure<ForwardedHeadersOptions>(options =>
                 {
+                    // https://github.com/dotnet/aspnetcore/blob/71a046bd88f9ce469e76ddea492de02bfae79252/src/Middleware/HttpOverrides/src/ForwardedHeadersMiddleware.cs
+                    // The KnownNetworks process works as follows:
+                    //
+                    //     Reverse X-PROTOCOL-FOR
+                    //
+                    //     for each entry in this header
+                    //     {
+                    //        if (KnownProxies contains a value AND it does not contain this header value OR the entry is invalid)
+                    //           return the last RemoteIP address
+                    //
+                    //         Update RemoteIP to be entry's parsed ip address
+                    //     }
+                    //
+                    // strip the X-PROTOCOL-FOR back to the entry that failed.
+                    //
+                    // Enable debug logging on Microsoft.AspNetCore.HttpOverrides.ForwardedHeadersMiddleware to help investigate issues.
+
                     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
                     if (config.KnownProxies.Length == 0)
                     {
