@@ -178,6 +178,22 @@ namespace Jellyfin.Server.Extensions
         /// <param name="pluginAssemblies">An IEnumerable containing all plugin assemblies with API controllers.</param>
         /// <param name="config">The <see cref="NetworkConfiguration"/>.</param>
         /// <returns>The MVC builder.</returns>
+        /// <remarks>
+        /// The KnownNetworks process works as follows:
+        ///
+        ///     Reverse X-PROTOCOL-FOR
+        ///
+        ///     for each entry in this header
+        ///     {
+        ///        if (KnownProxies does not contain this header value or entry is invalid)
+        ///           return the last entry
+        ///
+        ///         Update RemoteIP to be entry's parsed ip address
+        ///     }
+        ///
+        /// strip the X-PROTOCOL-FOR back to the entry that failed.
+        ///
+        /// Enable debug logging on Microsoft.AspNetCore.HttpOverrides.ForwardedHeadersMiddleware to help investigate issues.</remarks>
         public static IMvcBuilder AddJellyfinApi(this IServiceCollection serviceCollection, IEnumerable<Assembly> pluginAssemblies, NetworkConfiguration config)
         {
             IMvcBuilder mvcBuilder = serviceCollection
