@@ -38,21 +38,6 @@ namespace Jellyfin.Server.Middleware
             if (serverApplicationHost.CoreStartupHasCompleted
                 || httpContext.Request.Path.Equals("/system/ping", StringComparison.OrdinalIgnoreCase))
             {
-                if (httpContext.Request.Path.Equals("/system/headers", StringComparison.OrdinalIgnoreCase))
-                {
-                    string headers = string.Empty;
-                    foreach (var key in httpContext.Request.Headers.Keys)
-                    {
-                        headers += key + "=" + httpContext.Request.Headers[key] + Environment.NewLine;
-                    }
-
-                    headers += "IP " + httpContext.Connection.RemoteIpAddress?.ToString() ?? string.Empty;
-                    httpContext.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-                    httpContext.Response.ContentType = MediaTypeNames.Text.Html;
-                    await httpContext.Response.WriteAsync(headers, httpContext.RequestAborted).ConfigureAwait(false);
-                    return;
-                }
-
                 await _next(httpContext).ConfigureAwait(false);
                 return;
             }
