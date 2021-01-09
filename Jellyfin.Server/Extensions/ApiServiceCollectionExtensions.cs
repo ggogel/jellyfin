@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using System.Reflection;
 using Emby.Server.Implementations;
 using Jellyfin.Api.Auth;
@@ -20,6 +21,7 @@ using Jellyfin.Api.Constants;
 using Jellyfin.Api.Controllers;
 using Jellyfin.Api.ModelBinders;
 using Jellyfin.Data.Enums;
+using Jellyfin.Networking.Configuration;
 using Jellyfin.Server.Configuration;
 using Jellyfin.Server.Filters;
 using Jellyfin.Server.Formatters;
@@ -174,30 +176,63 @@ namespace Jellyfin.Server.Extensions
         /// </summary>
         /// <param name="serviceCollection">The service collection.</param>
         /// <param name="pluginAssemblies">An IEnumerable containing all plugin assemblies with API controllers.</param>
-        /// <param name="knownProxies">A list of all known proxies to trust for X-Forwarded-For.</param>
+        /// <param name="config">The <see cref="NetworkConfiguration"/>.</param>
         /// <returns>The MVC builder.</returns>
-        public static IMvcBuilder AddJellyfinApi(this IServiceCollection serviceCollection, IEnumerable<Assembly> pluginAssemblies, IReadOnlyList<string> knownProxies)
+        public static IMvcBuilder AddJellyfinApi(this IServiceCollection serviceCollection, IEnumerable<Assembly> pluginAssemblies, NetworkConfiguration config)
         {
             IMvcBuilder mvcBuilder = serviceCollection
                 .AddCors()
                 .AddTransient<ICorsPolicyProvider, CorsPolicyProvider>()
                 .Configure<ForwardedHeadersOptions>(options =>
                 {
+                    // https://github.com/dotnet/aspnetcore/blob/71a046bd88f9ce469e76ddea492de02bfae79252/src/Middleware/HttpOverrides/src/ForwardedHeadersMiddleware.cs
+                    // The KnownNetworks process works as follows:
+                    //
+                    //     Reverse X-PROTOCOL-FOR
+                    //
+                    //     for each entry in this header
+                    //     {
+                    //        if (KnownProxies contains a value AND it does not contain this header value OR the entry is invalid)
+                    //           return the last RemoteIP address
+                    //
+                    //         Update RemoteIP to be entry's parsed ip address
+                    //     }
+                    //
+                    // strip the X-PROTOCOL-FOR back to the entry that failed.
+                    //
+                    // Enable debug logging on Microsoft.AspNetCore.HttpOverrides.ForwardedHeadersMiddleware to help investigate issues.
+
                     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-                    if (knownProxies.Count == 0)
+                    if (config.KnownProxies.Length == 0)
                     {
                         options.KnownNetworks.Clear();
                         options.KnownProxies.Clear();
                     }
                     else
                     {
-                        for (var i = 0; i < knownProxies.Count; i++)
+                        for (var i = 0; i < config.KnownProxies.Length; i++)
                         {
-                            if (IPHost.TryParse(knownProxies[i], out var host))
+                            if (IPHost.TryParse(config.KnownProxies[i], out var host))
                             {
+                                if ((!config.EnableIPV4 && host.AddressFamily == AddressFamily.InterNetwork)
+                                    || (!config.EnableIPV6 && host.AddressFamily == AddressFamily.InterNetworkV6))
+                                {
+                                    continue;
+                                }
+
+                                if (config.EnableIPV6 && config.EnableIPV4 && host.AddressFamily == AddressFamily.InterNetwork)
+                                {
+                                    // If the server is using dual-mode sockets, IPv4 addresses are supplied in an IPv6 format.
+                                    // https://docs.microsoft.com/en-us/aspnet/core/host-and-deploy/proxy-load-balancer?view=aspnetcore-5.0 .
+                                    host.Address = host.Address.MapToIPv6();
+                                }
+
                                 options.KnownProxies.Add(host.Address);
                             }
                         }
+
+                        // Only set forward limit if we have some known proxies.
+                        options.ForwardLimit = options.KnownProxies.Count == 0 ? 1 : null;
                     }
                 })
                 .AddMvc(opts =>
