@@ -185,7 +185,7 @@ namespace Jellyfin.Server.Extensions
                 .AddTransient<ICorsPolicyProvider, CorsPolicyProvider>()
                 .Configure<ForwardedHeadersOptions>(options =>
                 {
-                    // https://github.com/dotnet/aspnetcore/blob/71a046bd88f9ce469e76ddea492de02bfae79252/src/Middleware/HttpOverrides/src/ForwardedHeadersMiddleware.cs
+                    // https://github.com/dotnet/aspnetcore/blob/master/src/Middleware/HttpOverrides/src/ForwardedHeadersMiddleware.cs
                     // The KnownNetworks process works as follows:
                     //
                     //     Reverse X-PROTOCOL-FOR
