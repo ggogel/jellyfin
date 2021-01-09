@@ -229,10 +229,14 @@ namespace Jellyfin.Server.Extensions
 
                                 options.KnownProxies.Add(host.Address);
                             }
+                            if(IPNetAddress.TryParse(config.KnownProxies[i], out var net))
+                            {
+                                options.KnownNetworks.Add(new IPNetwork(net.Address,net.PrefixLength));
+                            }
                         }
 
                         // Only set forward limit if we have some known proxies.
-                        options.ForwardLimit = options.KnownProxies.Count == 0 ? 1 : null;
+                        options.ForwardLimit = options.KnownProxies.Count + options.KnownNetworks.Count == 0 ? 1 : null;
                     }
                 })
                 .AddMvc(opts =>
